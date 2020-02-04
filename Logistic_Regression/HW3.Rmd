@@ -1,0 +1,303 @@
+---
+title: "Homework 3"
+author: "Arman Aghamyan "
+date: "February 21, 2019"
+output: html_document
+---
+
+
+<i>For this Homework, you are required to submit both Markdown and HTML files with your answers and code in it. Be sure that the .Rmd file is working, so when I run it, there would be no errors and represent the same information as HTML. Write your code and interpretations under each question. The interpretations of the results need to be written below or above all the charts, summaries, or tables. Do not remove problems from your Markdown file. 
+
+Use biodata.csv dataset uploaded on Moodle to analyze the relationship between the presence of kidney disease and different factors. The description of the variables is given in a separate file. Pay close attention to the names of axes, titles, and labels. </i> <p>
+
+
+
+<b> Problem 1. 2 pt. </b> <p>
+
+Load the file.<p>
+
+Get rid of variables which are irrelevant for logistic regression analysis using function select(). Also, skip variables which are absent in .txt file). 
+<p>
+
+Check whether the data types are correct, if not make appropriate corrections assigning labels to each level according to the data description. <p>
+
+For all **numeric** variables replace missing values by column mean. <p>
+Create new dataset without missing data (remove observations with missing values for **categorical** variables) <p>
+
+How many variables and observations do you have before and now?
+
+```{r}
+library(MASS)
+library(dplyr)
+library(zoo)
+bio<-read.csv("biodata.csv",na.strings = "?")
+str(bio)
+any(duplicated(bio$id))
+bio<-dplyr::select(bio,-c(id,sc, pcv,pe))
+any(is.na(bio))
+bio$su<-ordered(bio$su,levels=c(0,1,2,3,4,5))
+bio$class<-as.factor(bio$class)
+nm<- sapply(bio, is.numeric)
+bio[nm] <- lapply(bio[nm], na.aggregate)
+bio[nm]<-round(bio[nm])
+bio<-na.omit(bio)
+str(bio)
+
+```
+We had 381 observations in 22 columns before,now they are 322 in 17 columns.
+
+
+<b> Problem 2. 3 pt. </b> <p>
+
+a. Check the relationship between each numeric variable and the presence of kidney disease. Save only the two most important numeric variables using boxplots. Comment on it. <p>
+
+b. Use the glm() function to perform a logistic regression with Class as the response and one of **numeric** variables as the predictor (use results of 2a). Use the summary() function to print the result. Is your explanatory variable significant? Why? <p>
+
+c. Plot the response and the predictor, and sigmoid line. For this task, you should create a sequence of x values and predict your model for them, then add to your graph <p>
+
+Problem 2
+A)
+```{r  fig.height = 5, fig.width = 12}
+library(ggplot2)
+library(gridExtra)
+library(ggcorrplot)
+
+num<-bio%>% select_if(is.numeric)
+ggcorrplot(cor(num), hc.order = TRUE, type = "lower",
+   lab = TRUE)
+
+b1<-ggplot(data = bio, aes(y =age, x = class,color = class))+
+  geom_boxplot()+
+  scale_x_discrete(labels= levels(bio$class) )+
+  stat_summary(fun.y = "mean",geom = 'point',col='red', shape=17, size=3)+
+  labs(title ="Presence of Chronic Kidney Disease by Age " ,color =  "Presence of  Disease",y='Age',x="Presence of Chronic Kidney Disease")+
+  theme(plot.title = element_text(hjust = 1))
+
+
+
+
+b2<-ggplot(data = bio, aes(y =bgr, x = class,color = class))+
+  geom_boxplot()+
+  scale_x_discrete(labels= levels(bio$class) )+
+  stat_summary(fun.y = "mean",geom = 'point',col='red', shape=17, size=3)+
+  labs(title ="Presence of Disease by Blood Glucose Random (mgs/dl) " ,color =  "Presence of  Disease",y='Blood Glucose Random (mgs/dl)',x="Presence of Chronic Kidney Disease")+
+  theme(plot.title = element_text(hjust = 1))
+
+
+grid.arrange(b1,b2,nrow=1)
+
+```
+People who has the Kidney disease tend to have higher  blood glucose random  counts than people who doesn't have illness.
+Poeple whoes age is over 50 tend to have kidney disease than more young people.But we have outliers here.
+
+B)
+```{r}
+library(glmnet)
+library(caret)
+prop.table((table(bio$class)))
+set.seed(1)
+model1<-glm(class~bgr,data=bio,family ='binomial')
+summary(model1)
+exp(coef(model1))
+range(bio$bgr)
+
+```
+Age is a significant variable as the p_values is 0.000292 and is<0.05.
+
+
+C)
+```{r}
+
+sigmoid <- function (x) 1 / (1 + exp(3.631494- 0.030361 * x))
+x<-seq(22,490,0.01)
+plot(x, sigmoid(x), col='red')
+
+```
+
+
+<b> Problem 3. 4 pt. </b> <p>
+Use the glm() function to perform a logistic regression with Class as the response and one of **categorical** variables as the predictor (chose significant one). Use the summary() function to print the results. <p>
+
+a. Interpret the coefficients of the explanatory variable in terms of absolute and exponential values? <p>
+b. Compute probability for the base value of your explanatory variable. Comment on it. <p>
+c. What do Null deviance and residual deviance of summary output mean? <p>
+d. Calculate the value of the exponent of the b1 coefficient using only your data and functions addmargins() and table(). <p>
+
+
+
+```{r}
+
+#A
+model2<-glm(class~rbc,bio,family ='binomial')
+summary(model2)
+coef(model2)
+exp(coef(model2))
+probabnormal<-predict(model2,newdata = data.frame(rbc='abnormal'),type = 'response')
+print(probabnormal)
+
+
+
+#D
+addmargins(table(bio$rbc,bio$class))
+psn<-103/232
+psabn<-80/90
+oddsnormal<-psn/(1-psn)
+oddsabnormal<-psabn/(1-psabn)
+oddsratio<-oddsnormal/oddsabnormal
+print(oddsratio)
+
+```
+A) An incrimental increase in normal rbc will decrease the probability of having kidney disease on average by 99,8% (0.09980062*100%) if other factors hold constant.
+B) People whoes red blood cells are normal have 92% less odds to have disease compared to people have abnormal cells.
+
+C)From summary, we have a value of 440.36 on 321 degrees of freedom. Including the independent variables (class and rbc) decreased the deviance to  381.49  on 320 degrees of freedom, a significant reduction in deviance.
+The Residual Deviance has reduced approximately by 60 with a loss of two degrees of freedom.
+
+
+
+
+
+<b> Problem 4. 4 pt. </b> <p>
+
+a. Use the full data set to perform the model with Class as a dependent variable. Use the stepAIC() function to obtain the best model based on AIC criteria. Use the backward selection procedure. Do not show the output.<p>
+
+b. Remove all non-significant variables from the last model. Show only the best model(all variables must be significant at least at the level 0.01). Use the summary() function to print the result. <p>
+
+c. Pick your own new observation and predict the y value. Comment on it. <p>
+
+d. Is it possible to calculate R square for logistic regression? <p>
+
+
+```{r include=FALSE}
+model_full<-glm(class~.,data=bio,family = 'binomial')
+model_AIC<-stepAIC(model_full,direction = 'backward')
+```
+
+```{r}
+summary(model_AIC)
+model_best<-glm(class~rbc+bgr+hemo+bp+cad+sod,data=bio,family="binomial")
+summary(model_best)
+predict(model_best,newdata = data.frame(sod=mean(bio$sod),rbc='abnormal',bgr=mean(bio$bgr),hemo=mean(bio$hemo),bp=mean(bio$bp),cad='no'),type = 'response')
+
+
+```
+B)After removing one of the non_significant variables,I noticed that age became non-significant.
+
+C)More than 99 persent we are sure that our new observation has disease, and as out treshhold is    0.5 , we classify it as 1.
+
+D) By R2McFadden=1???log(Lc)log(Lnull),we can calculate with this formula.
+
+
+
+
+
+
+
+<b> Problem 5. 7 pt. </b> <p>
+
+a. Divide the data frame into Train and Test sets (70:30), such that the proportion for training and testing sets must refer to the proportion of whole data. Do not forget about the set.seed() function.<p>
+
+b. Now fit two logistic regression models using training data. Both models should be the result of Problem 4a. and Problem 4b. <p>
+
+c. For the first model (which contains only significant coefficients) predict the probability of the presence of chronic kidney disease for testing set. Compute the confusion matrix using table() function. Figure out the overall fraction of correct predictions, sensitivity, and specificity for the held out data using only confusion matrix. Check your computations using the function confusionMatrix(). <p>
+
+d. Explain what the confusion matrix is telling you about the types of mistakes made by logistic regression. <p> 
+
+e. What is the difference between the ROC and the precision-recall curve (PRC)? When do we need to consider PRC? Why? Plot the PRC if it is applicable to your models?<p>  
+
+f. Plot ROC curve for both models using the function ggroc {pROC}. Which models is the best? Why? <p>
+
+A) B) C) D)
+```{r}
+
+library(caret)
+set.seed(1)
+train_index<-createDataPartition(bio$class,p = 0.7,list = F)
+Train<-bio[train_index,]
+Test<-bio[-train_index,]
+dim(Test)
+table(Train$class)/sum(table(Train$class))
+table(Test$class)/sum(table(Test$class))
+model_3<-glm(model_best,data=Train,family ="binomial")
+model_4<-glm(model_AIC,data=Train,family='binomial')
+prl<-predict(model_3,newdata =Test,type='response')
+pr_class<-ifelse(prl>0.5,1,0)
+conf_mat<-addmargins(table(Test$class,pr_class))
+Accuracy<-sum(c(conf_mat[1,1],conf_mat[2,2]))/conf_mat[3,3]
+Sensitivity<-50/54
+Specificity<-39/41
+print(paste("Overall accuracy :", Accuracy,
+            "Sensitivity :",Sensitivity,
+            "Specificity : " ,Specificity))
+confusionMatrix(as.factor(pr_class),Test$class,positive = "1")
+
+
+
+```
+As we see Overall Accuracy is 0.9684 which is high enough,our benchmark was 56% and we get 0.9630 of sensitivity which is also better for our model.P_values is significant for whole model.
+
+
+E) and F) 
+
+```{r}
+library(ROCR)
+P_Test<-prediction(prl,Test$class)
+perf<-performance(P_Test,"prec","rec")
+plot(perf,colorize=T)
+performance(P_Test,"auc")@y.values
+Recall<-unlist(perf@x.values)
+Precision<-unlist(perf@y.values)
+Alpha<-unlist(perf@alpha.values)
+bios<-data.frame(Recall,Precision,Alpha)
+PRC1<-ggplot(bios,aes(x=Recall,y=Precision,color=Alpha))+geom_line()+ theme_bw()+ labs(x='Recall',y='Precision',title='Precision-Recall curve by Best Model',color='Cutoff values')
+
+pr_AIC<-predict(model_AIC,newdata = Test,type = 'response')
+prAIC_class<-ifelse(pr_AIC>0.5,1,0)
+P_Test2<-prediction(pr_AIC,Test$class)
+perf2<-performance(P_Test2,'prec','rec')
+plot(perf2,colorize=T)
+performance(P_Test2,"auc")@y.values
+Recall<-unlist(perf2@x.values)
+Precision<-unlist(perf2@y.values)
+Alpha<-unlist(perf2@alpha.values)
+bios2<-data.frame(Recall,Precision,Alpha)
+PRC_AIC<-ggplot(bios2,aes(x=Recall,y=Precision,color=Alpha))+geom_line()+ theme_bw()+ labs(x='Recall',y='Precision',title='Precision-Recall curve by AIC Model',color='Cutoff values')
+
+
+grid.arrange(PRC1,PRC_AIC,nrow=1)
+
+library(pROC)
+Roc<-roc(Test$class,pr_class)
+plt1<-ggroc(Roc,alpha = 0.5, colour = "red", linetype = 1, size = 1)+ggtitle("ROC curve of the Model")
+plt1
+
+
+Roc2<-roc(Test$class,pr_AIC)
+plt2<-ggroc(Roc2,alpha = 0.5, colour = "blue", linetype = 1, size = 1)+ggtitle("ROC curve of the AIC Model ")
+
+grid.arrange(plt1, plt2,nrow=1)
+
+
+```
+
+
+ ROC curve represents relationship between RECALL(True Positive Rate) and False Positive Rate, while PRC curve represents relationship between RECALL(True positive Rate) and PRECISION.We can use PRC when we have a class imbalance,or when detecting a rare positive case is much more important than detecting negative case.
+In our case our data is more or less balances(43% and 57%),so we can use ROC curve.By plots(PRC and ROC curves) we see that AIC model predicted better than our model,because curve of AIC model is closer to 1 in both plots.
+
+
+
+
+<b> Bonus. 2 pt </b> <p>
+While evaluating the goodness of fit of the first model I used the Hosmer-Lemeshow test. The Chi-square value of 9.156 is displayed on my output. Try to calculate this number without any extra libraries. Do not use the same functions which are written in Hosmer-Lemeshow test in R.  **Hint:** Firstly you should understand the meaning of this test. I leave the first part of my code to obtain the same result and to help you solve the problem.  
+
+![](Capture.PNG)
+
+```{r}
+
+```
+
+
+
+
+
+<b>Please, make brief and meaningful conclusions.<b>
