@@ -1,0 +1,259 @@
+---
+title: "Homework_2"
+author: "Arman_Aghamyan"
+date: "February 13, 2019"
+output: html_document
+---
+
+For this Homework, you are required to submit both Markdown and HTML files with your answers and code in it. Be sure that the .Rmd file is working, so when I run it, there would be no errors and represent the same information as HTML. Write your code and interpretations under each question. The interpretations of the results need to be written below or above all the charts, summaries, or tables. Do not remove problems from your Markdown file. 
+
+Use gpafactors.csv dataset uploaded on Moodle to analyze the relationship between grade point average of students and different factors. The description of the variables is given in a separate file. Pay close attention to the names of axes, titles, and labels. <p>
+
+
+
+<b> Problem 1. 1 pt. </b> <p>
+
+Load the file.<p>
+
+Get rid of variables that are irrelevant for regression analysis using function select(). <p>
+
+Check whether the data types are correct, if not make appropriate corrections assigning labels to each level according to the data description. <p>
+
+
+```{r}
+library(plyr)
+library(ggplot2)
+library(gridExtra)
+library(ggcorrplot)
+
+gpaf<-read.csv('gpafactors.csv ')
+str(gpaf)
+any(duplicated(gpaf$X))
+any(duplicated(gpaf$studentid))
+
+library(dplyr)
+gpaf<-select(gpaf,-c(X,studentid,surveydate))
+gpaf$age<-as.numeric(gpaf$age)
+gpaf$ehpw<-as.numeric(gpaf$ehpw)
+gpaf$hpw<-as.numeric(gpaf$hpw)
+gpaf$imp<-ordered(gpaf$imp,levels=c(1,2,3,4,5))
+gpaf$job<-revalue(gpaf$job, c("empl"="Employed", "unempl"="Uneployed"))
+str(gpaf)
+
+```
+
+
+
+
+
+
+<b> Problem 2. 2 pt. </b> <p>
+
+Find the two most correlated numeric variables with grade point average of students using cor() and pairs() functions. Comment on it. <p>
+Find the binary variables which affect grade point average of students using boxplots. Comment on it. <p>
+
+```{r}
+num<-gpaf %>% select_if(is.numeric)
+cat<-gpaf %>%select_if(is.factor)
+library(ggplot2)
+
+ggcorrplot(cor(num), hc.order = TRUE, type = "lower",
+   lab = TRUE)
+
+pairs(num)
+
+b1<-ggplot(data = gpaf, aes(y = gpa, x = gender,color = gender))+
+  geom_boxplot()+
+  scale_x_discrete(labels= levels(gpaf$gender) )+
+  stat_summary(fun.y = "mean",geom = 'point',col='red', shape=17, size=3)+
+  labs(title ="GPA By Gender " ,color =  "gender",y='GPA',x="Gender")+
+  theme(plot.title = element_text(hjust = 1))
+b1
+b2<-ggplot(data = gpaf, aes(y = gpa, x = marital.status,color = marital.status))+
+  geom_boxplot()+
+  scale_x_discrete(labels= levels(gpaf$marital.status) )+
+  stat_summary(fun.y = "mean",geom = 'point',col='red', shape=17, size=3)+
+  labs(title ="GPA By Marital Status " ,color =  "marital status",y='GPA',x="Marital Status")+
+  theme(plot.title = element_text(hjust = 1))
+b2
+b3<-ggplot(data = gpaf, aes(y = gpa, x = job,color = job))+
+  geom_boxplot()+
+  scale_x_discrete(labels= levels(gpaf$job) )+
+  stat_summary(fun.y = "mean",geom = 'point',col='red', shape=17, size=3)+
+  labs(title ="GPA By Working Status " ,color =  "Working Status",y='GPA',x="Working Status")+
+  theme(plot.title = element_text(hjust = 1))
+b3
+b4<-ggplot(data = gpaf, aes(y = gpa, x = type,color = type))+
+  geom_boxplot()+
+  scale_x_discrete(labels= levels(gpaf$type) )+
+  stat_summary(fun.y = "mean",geom = 'point',col='red', shape=17, size=3)+
+  labs(title ="GPA By Study Modes " ,color =  "Study Modes",y='GPA',x="Study Modes")+
+  theme(plot.title = element_text(hjust = 1))
+b4
+b5<-ggplot(data = gpaf, aes(y = gpa, x = imp,color = imp))+
+  geom_boxplot()+
+  scale_x_discrete(labels= levels(gpaf$imp) )+
+  stat_summary(fun.y = "mean",geom = 'point',col='red', shape=17, size=3)+
+  labs(title ="GPA By Importance of Getting High GPA " ,color =  "Importance Level",y='GPA',x="Importance Levels of High GPA")+
+  theme(plot.title = element_text(hjust = 1))
+b5
+
+```
+
+For numeric variables
+The most correlated variables with GPA are 
+1)hpw(hours spent on studying per week)>>>they correlated positivle
+2)hsleep(hours for sleep per day)>>>they correlated negatively
+
+For categorical variables
+1)As we see married students have lowest gpaes,divorced has middle gpas,but single ones has very high distribution from lowests up to highests and have outliers too.
+2)Males study rather well than female.
+3)Working influence on gpa very bad,but among unemployed students there are a lot of outliers who not only  working but not study well as too.
+4)Full-time students have higher gpaes than part-time students.
+5)By the importance of getting high GPA students are normally distributed,but we have some outliers.And a little bit is more important for students to get GPA over 85.
+
+
+<b> Problem 3. 4 pt. </b> <p>
+
+Use the lm() function to perform a simple linear regression with GPA as the response and the most correlated numeric variable as the predictor. Use the summary() function to print the results. Comment on the output: <p>
+
+a. Explain the meanings of coefficients (do they all have a meaning)? 
+<p>
+
+b. Why do we need to add b0 to the regression model?
+The intercept ( constant) is the expected mean value of Y when all X=0. Start with a regression equation with one predictor, X. If X sometimes equals 0, the intercept is simply the expected mean value of Y at that value <p>
+
+c. Which coefficients are significant (in which level)? Why and why not? 
+<p>
+d. Explain the meaning of R-squared in your model.
+<p>
+e. Plot the response and the predictor. Use the geom_abline() function to display the least squares regression line. <p>
+
+
+```{r}
+model1<-lm(gpa~hpw,data=gpaf)
+summary(model1)
+```
+#A
+Regression coefficients represent the mean change in the response variable for one unit of change in the predictor variable while holding other predictors in the model constant.The only one which are significant has meaning.
+#B
+We need Bo in models to have inctercept,with which we compare effects of our variables.Changes in the predictor's value are related to changes in the response.
+#C
+The predictores that have p_value <0.5 are significant,but when p_value>0.5 then changes in the predictor are not associated with changes in the response.
+#D
+R-squared is a statistical measure of how close the data are to the fitted regression line.R^2=1-RSS/TSS.In my model 80.6% of variability of gpa is explained by the spent hours per week on study.
+#E
+```{r}
+ggplot(gpaf,aes(hpw,gpa))+geom_point()+geom_abline(intercept =6.03372,slope =2.89477,colour='red'  )+ggtitle(" Student's GPA By Spending Hours on Studying Per Week ") +xlab('Hours Per Week') + ylab('GPA')
+```
+
+
+
+
+
+<b> Problem 4. 6 pt. </b> <p>
+
+a. Discover the relationship between marital status and grade point average of the students using boxplot. <p>
+b. Run the regression model with GPA as a response and marital status as explanatory variable.<p>
+ In this regression model, the reference group for the categorical variable should be the single value. Use relevel().<p>
+c. Interpret the coefficients of a categorical variable. <p>
+d. Add to previous model one numeric variable. Do not apply summary(). Plot the response and the predictors. You must have 3 labeled regression lines.<p>
+
+
+```{r}
+#A
+ggplot(data = gpaf, aes(y = gpa, x = marital.status,color = marital.status))+
+  geom_boxplot()+
+  scale_x_discrete(labels= levels(gpaf$marital.status) )+
+  stat_summary(fun.y = "mean",geom = 'point',col='red', shape=17, size=3)+
+  labs(title ="GPA By Marital Status " ,color =  "marital status",y='GPA',x="Marital Status")+
+  theme(plot.title = element_text(hjust = 1))
+
+#B
+gpaf$marital.status<-relevel(gpaf$marital.status,ref = 'single')
+model2<-lm(gpa~marital.status,data=gpaf)
+summary(model2)
+ 
+
+```
+C) Interpretation of results
+R-squared The variables included in the model expalin 24.21% of the variance of GPA.
+Status Devorced has p_value <0,05 so it is significant,and the GPA is on average More by 2.9313 for those who are Divorced compared to those who are Single.
+Status Married is also significant and the GPA is on average Less by 25.2864 for those who are Married compared to those who are Single.
+
+D)
+```{r}
+model3<-lm(gpa~marital.status+hsleep,data =gpaf)
+library(ggiraphExtra)
+qplot(x = hsleep, y = gpa, color = marital.status, data = gpaf) +
+  stat_smooth(method = "lm", se = FALSE, fullrange = TRUE)+labs(title ="The Response and The Predictors " ,y='GPA',x="Hours of Sleep Per Day")
+
+
+
+```
+As we see for the hours of sleep per day affects  3 categories negatively .However married level more often get lower GPA comapred two others.
+
+
+
+
+
+<b> Problem 5. 7 pt. </b> <p>
+
+a. Divide the data frame into Train and Test sets (75:25). Do not forget about set.seed() function.<p>
+b. Let the threshold for correlation coefficient is 0.7. Is there multicollinearity in the data?<p>
+c. Try different models with gpa as a dependent variable. Exclude from the models one of multicollinear variables which is less correlated with GPA. <p>
+Save only the best model (based on both R^2 and sig.t). Why do we need to look at Adjusted R^2? <p>
+d. Formulate Null and Alternative hypotheses for all model (a.k.a for F statistics).Is the H0 rejected? How do we choose the level of significance?
+e. Use the stepAIC() function to obtain the best model based on AIC criteria. Use the forward selection procedure. Describe how forward selection works. <p> 
+f. Calculate RMSE for the testing set for both models, which one is better.
+
+A)
+```{r}
+library(MASS)
+set.seed(1)
+str(gpaf)
+s<-sample(nrow(gpaf),nrow(gpaf)*0.75,replace=F)
+train<-gpaf[s,]
+test<-gpaf[-s,]
+dim(train)
+dim(test)
+dim(gpaf)
+```
+B) and C)
+As we set treshold 0.7,so there are two variables(hsleep and hpw) that are correlated more than treshold.But as we should drop the one which is less correlated with GPA,so it will be hsleep.Besides when I ran the model,job was not significant too and Adj R-squared not changed a lot,which shoes that the variable does not ifluence on model,so I decided to drop it too from  model.
+```{r}
+model4<-lm(gpa~.-hsleep-job,data=train)
+summary(model4)
+
+
+```
+D)Null hypothesis is that our model is nor significant,and Alternative hypothesis is that at least one variable is significant.The "F value'' and "Prob(F)'' statistics test the overall significance of the regression model. Specifically, they test the null hypothesis that all of the regression coefficients are equal to zero. The F value is the ratio of the mean regression sum of squares divided by the mean error sum of squares.The value of Prob(F) is the probability that the null hypothesis for the full model is true (i.e., that all of the regression coefficients are zero).  For example, if Prob(F) has a value of 0.01 then there is 1 chance in 100 that all of the regression parameters are zero.  This low a value would imply that at least some of the regression parameters are nonzero and that the regression equation does have some validity in fitting the data.Now we have F-statistic and p-value significant for all model.This means that at least one variable is significant.Our Ho hypothesis is that the model is not significant,so we reject the null hypothesis.
+
+E)
+```{r}
+m1<- lm(gpa ~ ., data = train)
+m2<- lm(gpa ~ 1, data=train)
+mod_step<-stepAIC(m2,direction="forward",scope=list(upper=m1,lower=m2))
+summary(mod_step)
+library(Metrics)
+pred1<-predict(model4,test)
+pred2<-predict(mod_step,test)
+RMSE_model4<-rmse(test$gpa,pred1)
+RMSE_AIC<-rmse(test$gpa,pred2)
+RMSE_model4
+RMSE_AIC
+
+```
+model with AIC is lower which means it predicts better that model I defined
+
+
+<b> Bonus. 1 pt </b> <p>
+Do we need to prefer the OLS estimation to ML evaluation in regression models if all assumptions of  Gauss-Markov theorem are satisfied for small data? Why? When we can equally use these methods?
+
+OLS model is a part of MLE,OLS should be used where sample normally distributed and it is simple method which tries to minimize the errors.However where a train data is small it can raise errors for test data. Whereas MLE estimation is more flexible and can handle variability .It finds  parameter which can maximize the likelihood.
+
+
+
+
+
+<b>Please, make brief and meaningful conclusions.<b>
