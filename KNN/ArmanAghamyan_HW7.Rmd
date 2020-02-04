@@ -1,0 +1,233 @@
+---
+title: "KNN"
+author: "Arman Aghamyan "
+date: "April 18, 2019"
+output: html_document
+---
+  <i>
+  You are required to submit both Markdown and HTML files. Data set (Spam E-mail Data) relevant for this assignment can be found in the R package "DAAG". 
+
+</i>
+  
+---------------------------------------------
+  
+  <b style="color:green">
+  
+  Problem 1 (10 pt.)
+
+ * a. Suppose the sysadmin wants to understand and predict the process of recognizing the emails as spam for new e-mails which make up 20% of your initial data. Compare the performance of the logit and k-NN for classification on your data. Which one is better? Why?
+  (Use the ROC curve to find the best cutoff value and cross-validation for choosing the value of k. Show both results graphically).
+
+ * b. What are the differences **(at least 3)** of these algorithms (in general)?
+  
+  </b>
+---------------------------------------------  
+```{r include = FALSE}
+library(DAAG)
+library(dplyr)
+library(Metrics)
+library(ggplot2)
+library(caret)
+library(AER)
+data("spam7")
+spam<-spam7
+str(spam)
+spam$yesno<-ifelse(spam$yesno=='n',0,1)
+spam$yesno<-as.factor(spam$yesno)
+set.seed(1)
+options(scipen=999)
+train_index<-createDataPartition(spam$yesno,p = 0.8,list = F)
+Train<-spam[train_index,]
+Test<-spam[-train_index,]
+dim(Test)
+dim(Train)
+```
+Logistic Regression
+```{r}
+logit<-glm(yesno~.-make,data=Train,family = binomial)
+summary(logit)
+pred<-predict(logit,Test)
+pr_class<-ifelse(pred>0.5,1,0)
+conf_mat<-addmargins(table(Test$yesno,pr_class))
+conf_mat
+confusionMatrix(as.factor(pr_class),Test$yesno,positive = "1")
+
+
+library(ggplot2)
+library(ROCR)
+P_test<-prediction(pred,Test$yesno)
+perf<-performance(P_test,'tpr','fpr')
+performance(P_test,'auc')@y.values
+FPR<-unlist(perf@x.values)
+TPR<-unlist(perf@y.values)
+alpha=unlist(perf@alpha.values)
+df<-data.frame(FPR,TPR,alpha)
+ggplot(df,aes(x=FPR,y=TPR,color=alpha)) + geom_line()+
+  theme_bw()+ labs(x="False Positive Rate",y="True Positive Rate",title="Roc Curve",color="Cutoff Values")
+
+
+
+```
+
+
+```{r}
+library(FNN)
+library(caret)
+
+
+grid<-expand.grid(k=1:25)
+set.seed(1)
+knn_model_1<-train(yesno~.,data=Train,method="knn",
+             trControl=trainControl("cv",number=5),
+             preProcess=c("center","scale"),
+             tuneGrid=grid)
+
+plot(knn_model_1)
+#so we get k=5
+knn_model<-FNN::knn(Train[,-7],Test[,-7],cl=Train$yesno,k=5)
+confusionMatrix(knn_model,Test$yesno,positive = '1')
+
+
+```
+A)Logistic-Accuracy : 0.8063 
+           Sensitivity : 0.5525
+ 
+  KNN-   Accuracy : 0.7813
+         Sensitivity : 0.6409
+         
+Looking at score we can say that KNN predicts better.
+
+B)
+1) KNN is a non-parametric model, where LR is a parametric model.
+
+2) KNN is comparatively slower than Logistic Regression.
+
+3) KNN supports non-linear solutions where LR supports only linear solutions.
+
+4) LR can derive confidence level (about its prediction), whereas KNN can only output the labels.
+
+
+
+
+
+---------------------------------------------
+  
+  <b style="color:green">
+  
+  Problem 2 (10 pt.)
+
+ * a. Suppose the sysadmin wants to predict the total length of words in capitals (based on their content and type) for new e-mails which make up 20% of your initial data. Compare the result of the linear regression and k-NN regression by solving the task. Which one is better? (Use RMSE, R squared to solve the task.)
+
+ * b.  When will regression outperform the k-NN?
+```{r warning=FALSE}
+lm_model<-lm(crl.tot~.,data=Train)
+summary(lm_model)
+LM_pred<-predict(lm_model,Test)
+RMSE<-rmse(LM_pred,Test$crl.tot)
+RMSE
+
+
+
+#knn
+library(caret)
+library(FNN)
+
+y=Train[1]
+y_1=Test[1]
+str(Train[7])
+Train$yesno=as.numeric(Train$yesno)
+Test$yesno=as.numeric(Test$yesno)
+
+
+grid<-expand.grid(k=1:25)
+set.seed(1)
+model_111<-train(crl.tot~.,data=Train,method="knn",
+                 trControl=trainControl("cv",number=4),# it was not working with more number of cross validation and was bringing Na s
+                 preProcess=c("center","scale"),        #of cross validation
+                 tuneGrid=grid
+)
+model_111_test<-knn.reg(Train[,-1],Test[,-1],Train$crl.tot,k=21)
+model_111$results[which.min(model_111$results$RMSE),]
+model_111$results[which.max(model_111$results$Rsquared),]
+
+
+
+```
+A) So as we see by Logistic Regression RMSE is 578.6469,r_squared= 0.07368,but by KNN_regression the best k=21,minRMSE=320,maxRsquared=0.484.So KNN-Regression predicts well than Logistic Regression.It predicts worse even if we drop non_significant variables.
+
+B) In regression, it takes K neighbours and returns their average to new value. To calculate the average, Euclidean distance is mostly used. Like classification problem, the optimal value of K is again the biggest challenge. However, you can use cross validation to take optimal K, observing all RMSEs. But, if your dataset is noisy and does have many idle features, it will perform bad. Really bad. So, removal of noise from data or dimensionality reduction is another important thing here.
+
+Moreover, feature scaling helps a lot in KNN. Although feature scaling is used mainly for classification tasks but it can help in regression task too. And after creating the model for regression, you can reverse-transform the normalized values once again to get the final results.
+
+
+</b>
+  
+  
+  
+  
+  
+  
+----------------------------------------------
+  
+  
+<b style="color:darkgreen">
+  
+  Bonus 1 (1 pt.)
+
+ * Calculate the Cohen's kappa value without additional functions.
+ * Explain the meaning of using kappa statistics.
+
+The kappa statistic is frequently used to test interrater reliability. The importance of rater reliability lies in the fact that it represents the extent to which the data collected in the study are correct representations of the variables measured.
+
+
+K=(Po-Pe)/(1-Pe)
+where Po is probability of true predictions(TN and TP) and Pe is expected probability of actual classes or in other words
+Po represents the actual observed agreement, and Pe represents chance agreement.
+The kappa is based on the chi-square table, and the Pe is obtained through the following formula:
+
+(((TN+FN)x(TN+FP))/n+((TP+FP)x(FN+TP))/n)/n 
+ 
+The Kappa statistic varies from 0 to 1, where
+
+
+Value of Kappa   |    Level of agreement     |    % of Data that are reliable
+
+0              = agreement equivalent to chance.
+
+0.1 - 0.20     = slight agreement.               | 0-4% 
+
+0.21 - 0.40    = fair agreement.                 | 4-15%
+
+0.41 - 0.60    = moderate agreement.             | 15-35%
+
+0.61 - 0.80    = substantial agreement.          | 35-63%
+
+0.81 - 0.99    = near perfect agreement.         | 63-81%
+
+1              = perfect agreement.              | 81-100%
+
+For cases such medical it better have  value over 80 as it is very serious case to make choice.
+
+Unfortunately, marginal sums may or may not estimate the amount of chance rater agreement under uncertainty.
+
+Perhaps the best way is to calculate both percent agreement and kappa. If there is likely to be much guessing among the raters, it may make sense to use the kappa statistic, but if raters are well trained and little guessing is likely to exist, the researcher may safely rely on percent agreement to determine interrater reliability.
+
+
+
+
+</b>
+
+
+<b style="color:darkgreen">
+
+Bonus 2 (2 pt.)
+
+Suppose we have one explanatory variable with equal values. 
+
+ * How can we use 1-NN to predict the response value of new observation with the same value of an explanatory variable? Is there any problem? 
+ 
+ * Do not use R to solve this task, or use it just as a supplementary tool.
+
+As I didn't test such case in R as you asked.I think if the values are the same,it should predict randomly among the values that train data has for y, or will not  predict anything.
+
+</b>
